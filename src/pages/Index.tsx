@@ -2,8 +2,9 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { UtensilsCrossed, ArrowRight } from "lucide-react";
+import { UtensilsCrossed, ArrowRight, Lock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { TABLES } from "@/data/mockdata";
 
 const Index = () => {
   const [tableNumber, setTableNumber] = useState("");
@@ -18,10 +19,16 @@ const Index = () => {
       return;
     }
 
-    // TODO: Valider avec la base de données
     const tableNum = parseInt(tableNumber);
     if (isNaN(tableNum) || tableNum < 1) {
       setError("Numéro de table invalide");
+      return;
+    }
+
+    // Vérifier si la table existe et est active
+    const table = TABLES.find(t => t.number === tableNum);
+    if (!table || !table.isActive) {
+      setError("Cette table n'est pas disponible");
       return;
     }
 
@@ -79,10 +86,19 @@ const Index = () => {
         </form>
 
         {/* Info supplémentaire */}
-        <div className="text-center">
+        <div className="text-center space-y-4">
           <p className="text-sm text-muted-foreground">
             Besoin d'aide ? Appelez un serveur 👋
           </p>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate("/admin/login")}
+            className="gap-2 text-xs"
+          >
+            <Lock className="w-3 h-3" />
+            Accès administration
+          </Button>
         </div>
       </Card>
     </div>

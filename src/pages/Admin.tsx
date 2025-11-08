@@ -1,17 +1,44 @@
-import { Card } from "@/components/ui/card";
+import { useEffect } from "react";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LayoutDashboard, UtensilsCrossed, ShoppingBag, Table, BarChart3 } from "lucide-react";
+import { LayoutDashboard, UtensilsCrossed, ShoppingBag, Table, BarChart3, LogOut } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { MenuManagement } from "@/components/admin/MenuManagement";
+import { OrdersManagement } from "@/components/admin/OrdersManagement";
+import { TablesManagement } from "@/components/admin/TablesManagement";
+import { StatsManagement } from "@/components/admin/StatsManagement";
 
 const Admin = () => {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Vérifier l'authentification
+    const isAuth = sessionStorage.getItem("adminAuth");
+    if (!isAuth) {
+      navigate("/admin/login");
+    }
+  }, [navigate]);
+
+  const handleLogout = () => {
+    sessionStorage.removeItem("adminAuth");
+    navigate("/admin/login");
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="bg-card border-b-2 border-primary/20 shadow-md">
         <div className="container mx-auto px-4 py-6">
-          <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
-            <LayoutDashboard className="text-primary" />
-            Administration
-          </h1>
+          <div className="flex justify-between items-center">
+            <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
+              <LayoutDashboard className="text-primary" />
+              Administration
+            </h1>
+            <Button variant="outline" onClick={handleLogout} className="gap-2">
+              <LogOut className="w-4 h-4" />
+              Déconnexion
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -50,31 +77,19 @@ const Admin = () => {
           </TabsList>
 
           <TabsContent value="orders" className="mt-8">
-            <Card className="p-8">
-              <h2 className="text-2xl font-bold mb-4">Gestion des commandes</h2>
-              <p className="text-muted-foreground">Les commandes seront affichées ici...</p>
-            </Card>
+            <OrdersManagement />
           </TabsContent>
 
           <TabsContent value="menu" className="mt-8">
-            <Card className="p-8">
-              <h2 className="text-2xl font-bold mb-4">Gestion du menu</h2>
-              <p className="text-muted-foreground">La gestion du menu sera disponible ici...</p>
-            </Card>
+            <MenuManagement />
           </TabsContent>
 
           <TabsContent value="tables" className="mt-8">
-            <Card className="p-8">
-              <h2 className="text-2xl font-bold mb-4">Gestion des tables</h2>
-              <p className="text-muted-foreground">La gestion des tables sera disponible ici...</p>
-            </Card>
+            <TablesManagement />
           </TabsContent>
 
           <TabsContent value="stats" className="mt-8">
-            <Card className="p-8">
-              <h2 className="text-2xl font-bold mb-4">Statistiques</h2>
-              <p className="text-muted-foreground">Les statistiques seront affichées ici...</p>
-            </Card>
+            <StatsManagement />
           </TabsContent>
         </Tabs>
       </main>

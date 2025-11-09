@@ -6,14 +6,44 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { CATEGORIES, MENU_ITEMS, MenuItem } from "@/data/mockdata";
-import { Plus, Edit, Trash2, Save } from "lucide-react";
+import { Plus, Edit, Trash2, Save, X } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { CreateDishForm } from "./CreateDishForm";
+
+interface DishOption {
+  id: string;
+  name: string;
+  price: number;
+}
 
 export const MenuManagement = () => {
   const [menuItems, setMenuItems] = useState(MENU_ITEMS);
   const [selectedCategory, setSelectedCategory] = useState(CATEGORIES[0].id);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { toast } = useToast();
 
   const filteredItems = menuItems.filter(item => item.categoryId === selectedCategory);
+  
+  const playBeep = () => {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.value = 800;
+    oscillator.type = 'sine';
+    
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.2);
+  };
 
   return (
     <div className="space-y-6">
@@ -22,10 +52,31 @@ export const MenuManagement = () => {
           <h2 className="text-3xl font-bold">Gestion du Menu 🍽️</h2>
           <p className="text-muted-foreground">Gérez les catégories, plats et options</p>
         </div>
-        <Button size="lg" className="gap-2">
-          <Plus />
-          Nouveau plat
-        </Button>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button size="lg" className="gap-2">
+              <Plus />
+              Nouveau plat
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-2xl">Créer un nouveau plat</DialogTitle>
+            </DialogHeader>
+            <CreateDishForm 
+              categoryId={selectedCategory} 
+              onSuccess={(newItem) => {
+                setMenuItems([...menuItems, newItem]);
+                setIsDialogOpen(false);
+                playBeep();
+                toast({
+                  title: "Plat créé ! 🎉",
+                  description: `${newItem.name} a été ajouté au menu`,
+                });
+              }}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Tabs defaultValue={CATEGORIES[0].id} onValueChange={setSelectedCategory}>

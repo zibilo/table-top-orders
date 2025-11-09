@@ -3,12 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { MenuItem, Option } from "@/data/mockdata";
 import { Plus, X } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface CreateDishFormProps {
   categoryId: string;
-  onSuccess: (item: MenuItem) => void;
+  onSuccess: () => void;
 }
 
 interface FormOption {
@@ -26,6 +27,8 @@ export const CreateDishForm = ({ categoryId, onSuccess }: CreateDishFormProps) =
   const [options, setOptions] = useState<FormOption[]>([]);
   const [optionName, setOptionName] = useState("");
   const [optionPrice, setOptionPrice] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
 
   const addOption = () => {
     if (optionName.trim()) {
@@ -44,28 +47,66 @@ export const CreateDishForm = ({ categoryId, onSuccess }: CreateDishFormProps) =
     setOptions(options.filter(opt => opt.id !== id));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!dishName.trim() || !dishPrice) {
       return;
     }
 
-    const newItem: MenuItem = {
-      id: `item_${Date.now()}`,
-      name: dishName,
-      description: description,
-      price: parseFloat(dishPrice),
-      image: emoji,
-      categoryId: categoryId,
-      options: options.length > 0 ? options.map(opt => ({
-        id: opt.id,
-        name: opt.name,
-        price: parseFloat(opt.price)
-      })) : undefined
-    };
+    setIsLoading(true);
 
-    onSuccess(newItem);
+    // Insert menu item
+    const { data: menuItem, error: menuError } = await supabase
+      .from('menu_items')
+      .insert([{
+        name: dishName,
+        description: description,
+        price: parseFloat(dishPrice),
+        emoji: emoji,
+        category_id: categoryId,
+        is_available: true
+      }])
+      .select()
+      .single();
+
+    if (menuError || !menuItem) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de créer le plat",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
+
+    // Insert options if any
+    if (options.length > 0) {
+      const { data: optionData, error: optionError } = await supabase
+        .from('options')
+        .insert([{
+          menu_item_id: menuItem.id,
+          name: 'Options',
+          is_multiple_choice: selectionType === 'multiple'
+        }])
+        .select()
+        .single();
+
+      if (!optionError && optionData) {
+        const choices = options.map(opt => ({
+          option_id: optionData.id,
+          name: opt.name,
+          price: parseFloat(opt.price)
+        }));
+
+        await supabase
+          .from('option_choices')
+          .insert(choices);
+      }
+    }
+
+    setIsLoading(false);
+    onSuccess();
   };
 
   return (
@@ -209,8 +250,8 @@ export const CreateDishForm = ({ categoryId, onSuccess }: CreateDishFormProps) =
 
       {/* Boutons d'action */}
       <div className="flex gap-3 pt-4">
-        <Button type="submit" size="lg" className="flex-1">
-          Créer le plat
+        <Button type="submit" size="lg" className="flex-1" disabled={isLoading}>
+          {isLoading ? "Création..." : "Créer le plat"}
         </Button>
       </div>
     </form>

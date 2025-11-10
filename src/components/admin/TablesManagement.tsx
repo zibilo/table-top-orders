@@ -3,12 +3,16 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Edit } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 export const TablesManagement = () => {
   const [tables, setTables] = useState<any[]>([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [tableNumber, setTableNumber] = useState("");
   const { toast } = useToast();
 
   const fetchTables = async () => {
@@ -42,30 +46,50 @@ export const TablesManagement = () => {
     fetchTables();
   };
 
-  const handleAddTable = async () => {
-    const maxTableNumber = tables.length > 0 
-      ? Math.max(...tables.map(t => t.table_number))
-      : 0;
+  const handleAddTable = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tableNumber) return;
 
-    const { error } = await supabase
-      .from('tables')
-      .insert([{ table_number: maxTableNumber + 1, is_active: true }]);
+    try {
+      const tableNum = parseInt(tableNumber);
+      
+      // Check if table number already exists
+      const { data: existing } = await supabase
+        .from("tables")
+        .select("id")
+        .eq("table_number", tableNum)
+        .single();
 
-    if (error) {
+      if (existing) {
+        toast({
+          title: "Erreur",
+          description: "Ce numéro de table existe déjà",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const { error } = await supabase
+        .from('tables')
+        .insert([{ table_number: tableNum, is_active: true }]);
+
+      if (error) throw error;
+
+      toast({
+        title: "Table ajoutée",
+        description: `Table ${tableNum} créée avec succès`,
+      });
+
+      setTableNumber("");
+      setDialogOpen(false);
+      fetchTables();
+    } catch (error) {
       toast({
         title: "Erreur",
         description: "Impossible d'ajouter la table",
         variant: "destructive",
       });
-      return;
     }
-
-    toast({
-      title: "Table ajoutée",
-      description: `Table ${maxTableNumber + 1} créée avec succès`,
-    });
-
-    fetchTables();
   };
 
   return (
@@ -75,10 +99,36 @@ export const TablesManagement = () => {
           <h2 className="text-3xl font-bold">Gestion des Tables 🪑</h2>
           <p className="text-muted-foreground">Gérez les tables disponibles pour les clients</p>
         </div>
-        <Button size="lg" className="gap-2" onClick={handleAddTable}>
-          <Plus />
-          Ajouter une table
-        </Button>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button size="lg" className="gap-2">
+              <Plus />
+              Ajouter une table
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Ajouter une table</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleAddTable} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="tableNumber">Numéro de table</Label>
+                <Input
+                  id="tableNumber"
+                  type="number"
+                  value={tableNumber}
+                  onChange={(e) => setTableNumber(e.target.value)}
+                  placeholder="Ex: 1, 2, 3..."
+                  required
+                  min="1"
+                />
+              </div>
+              <Button type="submit" className="w-full">
+                Créer la table
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">

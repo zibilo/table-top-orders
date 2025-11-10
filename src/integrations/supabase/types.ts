@@ -18,18 +18,21 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          image_url: string | null
           name: string
           updated_at: string
         }
         Insert: {
           created_at?: string
           id?: string
+          image_url?: string | null
           name: string
           updated_at?: string
         }
         Update: {
           created_at?: string
           id?: string
+          image_url?: string | null
           name?: string
           updated_at?: string
         }
@@ -42,6 +45,7 @@ export type Database = {
           description: string | null
           emoji: string | null
           id: string
+          image_url: string | null
           is_available: boolean
           name: string
           price: number
@@ -53,6 +57,7 @@ export type Database = {
           description?: string | null
           emoji?: string | null
           id?: string
+          image_url?: string | null
           is_available?: boolean
           name: string
           price: number
@@ -64,6 +69,7 @@ export type Database = {
           description?: string | null
           emoji?: string | null
           id?: string
+          image_url?: string | null
           is_available?: boolean
           name?: string
           price?: number

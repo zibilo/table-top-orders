@@ -23,6 +23,7 @@ export const CreateDishForm = ({ categoryId, onSuccess }: CreateDishFormProps) =
   const [dishPrice, setDishPrice] = useState("");
   const [description, setDescription] = useState("");
   const [emoji, setEmoji] = useState("🍽️");
+  const [image, setImage] = useState<File | null>(null);
   const [selectionType, setSelectionType] = useState<"single" | "multiple">("multiple");
   const [options, setOptions] = useState<FormOption[]>([]);
   const [optionName, setOptionName] = useState("");
@@ -50,63 +51,91 @@ export const CreateDishForm = ({ categoryId, onSuccess }: CreateDishFormProps) =
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!dishName.trim() || !dishPrice) {
+    if (!dishName.trim() || !dishPrice || !image) {
       return;
     }
 
     setIsLoading(true);
 
-    // Insert menu item
-    const { data: menuItem, error: menuError } = await supabase
-      .from('menu_items')
-      .insert([{
-        name: dishName,
-        description: description,
-        price: parseFloat(dishPrice),
-        emoji: emoji,
-        category_id: categoryId,
-        is_available: true
-      }])
-      .select()
-      .single();
+    try {
+      // Upload image
+      const fileExt = image.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage
+        .from('menu-images')
+        .upload(fileName, image);
 
-    if (menuError || !menuItem) {
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('menu-images')
+        .getPublicUrl(fileName);
+
+      // Insert menu item
+      const { data: menuItem, error: menuError } = await supabase
+        .from('menu_items')
+        .insert([{
+          name: dishName,
+          description: description,
+          price: parseFloat(dishPrice),
+          emoji: emoji,
+          image_url: publicUrl,
+          category_id: categoryId,
+          is_available: true
+        }])
+        .select()
+        .single();
+
+      if (menuError || !menuItem) {
+        toast({
+          title: "Erreur",
+          description: "Impossible de créer le plat",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // Insert options if any
+      if (options.length > 0) {
+        const { data: optionData, error: optionError } = await supabase
+          .from('options')
+          .insert([{
+            menu_item_id: menuItem.id,
+            name: 'Options',
+            is_multiple_choice: selectionType === 'multiple'
+          }])
+          .select()
+          .single();
+
+        if (!optionError && optionData) {
+          const choices = options.map(opt => ({
+            option_id: optionData.id,
+            name: opt.name,
+            price: parseFloat(opt.price)
+          }));
+
+          await supabase
+            .from('option_choices')
+            .insert(choices);
+        }
+      }
+
+      toast({
+        title: "Plat créé ! 🎉",
+        description: `${dishName} a été ajouté`,
+      });
+
+      setIsLoading(false);
+      onSuccess();
+    } catch (error) {
       toast({
         title: "Erreur",
         description: "Impossible de créer le plat",
         variant: "destructive",
       });
       setIsLoading(false);
-      return;
     }
-
-    // Insert options if any
-    if (options.length > 0) {
-      const { data: optionData, error: optionError } = await supabase
-        .from('options')
-        .insert([{
-          menu_item_id: menuItem.id,
-          name: 'Options',
-          is_multiple_choice: selectionType === 'multiple'
-        }])
-        .select()
-        .single();
-
-      if (!optionError && optionData) {
-        const choices = options.map(opt => ({
-          option_id: optionData.id,
-          name: opt.name,
-          price: parseFloat(opt.price)
-        }));
-
-        await supabase
-          .from('option_choices')
-          .insert(choices);
-      }
-    }
-
-    setIsLoading(false);
-    onSuccess();
   };
 
   return (
@@ -163,6 +192,18 @@ export const CreateDishForm = ({ categoryId, onSuccess }: CreateDishFormProps) =
               maxLength={2}
             />
           </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="dishImage" className="text-base">Image du plat *</Label>
+          <Input
+            id="dishImage"
+            type="file"
+            accept="image/*"
+            onChange={(e) => setImage(e.target.files?.[0] || null)}
+            required
+            className="h-12 text-base"
+          />
         </div>
       </div>
 

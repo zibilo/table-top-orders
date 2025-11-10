@@ -1,10 +1,31 @@
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
-import { MOCK_ORDERS, MENU_ITEMS } from "@/data/mockdata";
 import { TrendingUp, DollarSign, ShoppingBag, Star } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export const StatsManagement = () => {
-  const totalOrders = MOCK_ORDERS.length;
-  const totalRevenue = MOCK_ORDERS.reduce((acc, order) => acc + order.total, 0);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [menuItems, setMenuItems] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      const { data: ordersData } = await supabase
+        .from('orders')
+        .select('*');
+      
+      const { data: menuData } = await supabase
+        .from('menu_items')
+        .select('*');
+      
+      if (ordersData) setOrders(ordersData);
+      if (menuData) setMenuItems(menuData);
+    };
+
+    fetchStats();
+  }, []);
+
+  const totalOrders = orders.length;
+  const totalRevenue = orders.reduce((acc, order) => acc + Number(order.total_price), 0);
   const averageOrder = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
   const stats = [
@@ -28,7 +49,7 @@ export const StatsManagement = () => {
     },
     {
       title: "Plats au menu",
-      value: MENU_ITEMS.length.toString(),
+      value: menuItems.length.toString(),
       icon: Star,
       color: "text-secondary"
     }
@@ -58,20 +79,24 @@ export const StatsManagement = () => {
       </div>
 
       <Card className="p-8">
-        <h3 className="text-xl font-bold mb-4">Plats les plus commandés 🏆</h3>
+        <h3 className="text-xl font-bold mb-4">Plats au menu 🏆</h3>
         <div className="space-y-4">
-          {MENU_ITEMS.slice(0, 5).map((item, idx) => (
-            <div key={item.id} className="flex items-center justify-between p-4 bg-muted/50 rounded">
-              <div className="flex items-center gap-4">
-                <span className="text-3xl font-bold text-primary">#{idx + 1}</span>
-                <div>
-                  <p className="font-semibold">{item.name}</p>
-                  <p className="text-sm text-muted-foreground">{item.price.toFixed(2)}€</p>
+          {menuItems.length === 0 ? (
+            <p className="text-muted-foreground text-center py-4">Aucun plat au menu</p>
+          ) : (
+            menuItems.slice(0, 5).map((item, idx) => (
+              <div key={item.id} className="flex items-center justify-between p-4 bg-muted/50 rounded">
+                <div className="flex items-center gap-4">
+                  <span className="text-3xl font-bold text-primary">#{idx + 1}</span>
+                  <div>
+                    <p className="font-semibold">{item.name}</p>
+                    <p className="text-sm text-muted-foreground">{Number(item.price).toFixed(2)}€</p>
+                  </div>
                 </div>
+                <span className="text-2xl">{item.emoji || '🍽️'}</span>
               </div>
-              <span className="text-2xl">{item.image}</span>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </Card>
     </div>

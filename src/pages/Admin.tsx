@@ -7,6 +7,7 @@ import { MenuManagement } from "@/components/admin/MenuManagement";
 import { OrdersManagement } from "@/components/admin/OrdersManagement";
 import { TablesManagement } from "@/components/admin/TablesManagement";
 import { StatsManagement } from "@/components/admin/StatsManagement";
+import { NotificationCenter } from "@/components/admin/NotificationCenter";
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -34,10 +35,13 @@ const Admin = () => {
               <LayoutDashboard className="text-primary" />
               Administration
             </h1>
-            <Button variant="outline" onClick={handleLogout} className="gap-2">
-              <LogOut className="w-4 h-4" />
-              Déconnexion
-            </Button>
+            <div className="flex items-center gap-3">
+              <NotificationCenter />
+              <Button variant="outline" onClick={handleLogout} className="gap-2">
+                <LogOut className="w-4 h-4" />
+                Déconnexion
+              </Button>
+            </div>
           </div>
         </div>
       </header>

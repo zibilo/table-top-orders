@@ -7,13 +7,26 @@ import { ShoppingCart, ChevronLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useCart } from "@/hooks/useCart";
+import { CartSheet } from "@/components/CartSheet";
+import { useToast } from "@/hooks/use-toast";
 
 const Menu = () => {
   const { tableNumber } = useParams();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [categories, setCategories] = useState<any[]>([]);
   const [menuItems, setMenuItems] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const { 
+    cartItems, 
+    addToCart, 
+    updateQuantity, 
+    removeFromCart, 
+    clearCart, 
+    totalItems, 
+    totalPrice 
+  } = useCart();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -42,6 +55,21 @@ const Menu = () => {
 
   const filteredItems = menuItems.filter(item => item.category_id === selectedCategory);
 
+  const handleAddToCart = (item: any) => {
+    addToCart({
+      id: item.id,
+      name: item.name,
+      price: Number(item.price),
+      emoji: item.emoji,
+      image_url: item.image_url,
+    });
+    
+    toast({
+      title: "Ajouté au panier",
+      description: `${item.name} a été ajouté à votre panier`,
+    });
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -62,12 +90,15 @@ const Menu = () => {
             <p className="text-2xl font-bold text-primary">{tableNumber}</p>
           </div>
 
-          <Button variant="default" size="icon" className="relative">
-            <ShoppingCart />
-            <Badge className="absolute -top-2 -right-2 bg-secondary h-6 w-6 p-0 flex items-center justify-center">
-              0
-            </Badge>
-          </Button>
+          <CartSheet
+            cartItems={cartItems}
+            totalPrice={totalPrice}
+            totalItems={totalItems}
+            updateQuantity={updateQuantity}
+            removeFromCart={removeFromCart}
+            clearCart={clearCart}
+            tableNumber={tableNumber || ""}
+          />
         </div>
       </header>
 
@@ -120,7 +151,11 @@ const Menu = () => {
                             </Badge>
                           </div>
                         </div>
-                        <Button className="w-full mt-4" size="sm">
+                        <Button 
+                          className="w-full mt-4" 
+                          size="sm"
+                          onClick={() => handleAddToCart(item)}
+                        >
                           <ShoppingCart className="w-4 h-4 mr-2" />
                           Ajouter
                         </Button>

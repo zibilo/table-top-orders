@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 
 interface CreateDishFormProps {
   categoryId: string;
+  editingItem?: any;
   onSuccess: () => void;
 }
 
@@ -18,7 +19,7 @@ interface FormOption {
   price: string;
 }
 
-export const CreateDishForm = ({ categoryId, onSuccess }: CreateDishFormProps) => {
+export const CreateDishForm = ({ categoryId, editingItem, onSuccess }: CreateDishFormProps) => {
   const [dishName, setDishName] = useState("");
   const [dishPrice, setDishPrice] = useState("");
   const [description, setDescription] = useState("");
@@ -30,6 +31,40 @@ export const CreateDishForm = ({ categoryId, onSuccess }: CreateDishFormProps) =
   const [optionPrice, setOptionPrice] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+
+  // Charger les données du plat à modifier
+  useEffect(() => {
+    if (editingItem) {
+      setDishName(editingItem.name || "");
+      setDishPrice(editingItem.price?.toString() || "");
+      setDescription(editingItem.description || "");
+      setEmoji(editingItem.emoji || "🍽️");
+      
+      // Charger les options existantes
+      if (editingItem.options && editingItem.options.length > 0) {
+        const firstOption = editingItem.options[0];
+        setSelectionType(firstOption.is_multiple_choice ? "multiple" : "single");
+        
+        if (firstOption.option_choices && firstOption.option_choices.length > 0) {
+          const loadedOptions = firstOption.option_choices.map((choice: any) => ({
+            id: choice.id,
+            name: choice.name,
+            price: choice.price?.toString() || "0"
+          }));
+          setOptions(loadedOptions);
+        }
+      }
+    } else {
+      // Réinitialiser pour un nouveau plat
+      setDishName("");
+      setDishPrice("");
+      setDescription("");
+      setEmoji("🍽️");
+      setImage(null);
+      setSelectionType("multiple");
+      setOptions([]);
+    }
+  }, [editingItem]);
 
   const addOption = () => {
     if (optionName.trim()) {
@@ -51,87 +86,160 @@ export const CreateDishForm = ({ categoryId, onSuccess }: CreateDishFormProps) =
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!dishName.trim() || !dishPrice || !image) {
+    if (!dishName.trim() || !dishPrice) {
+      return;
+    }
+
+    // Image requise seulement pour nouveau plat
+    if (!editingItem && !image) {
       return;
     }
 
     setIsLoading(true);
 
     try {
-      // Upload image
-      const fileExt = image.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage
-        .from('menu-images')
-        .upload(fileName, image);
+      let imageUrl = editingItem?.image_url || "";
 
-      if (uploadError) throw uploadError;
+      // Upload nouvelle image si fournie
+      if (image) {
+        const fileExt = image.name.split('.').pop();
+        const fileName = `${Math.random()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('menu-images')
+          .upload(fileName, image);
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('menu-images')
-        .getPublicUrl(fileName);
+        if (uploadError) throw uploadError;
 
-      // Insert menu item
-      const { data: menuItem, error: menuError } = await supabase
-        .from('menu_items')
-        .insert([{
-          name: dishName,
-          description: description,
-          price: parseFloat(dishPrice),
-          emoji: emoji,
-          image_url: publicUrl,
-          category_id: categoryId,
-          is_available: true
-        }])
-        .select()
-        .single();
-
-      if (menuError || !menuItem) {
-        toast({
-          title: "Erreur",
-          description: "Impossible de créer le plat",
-          variant: "destructive",
-        });
-        setIsLoading(false);
-        return;
+        const { data: { publicUrl } } = supabase.storage
+          .from('menu-images')
+          .getPublicUrl(fileName);
+        
+        imageUrl = publicUrl;
       }
 
-      // Insert options if any
-      if (options.length > 0) {
-        const { data: optionData, error: optionError } = await supabase
-          .from('options')
+      if (editingItem) {
+        // Mode modification
+        const { error: updateError } = await supabase
+          .from('menu_items')
+          .update({
+            name: dishName,
+            description: description,
+            price: parseFloat(dishPrice),
+            emoji: emoji,
+            image_url: imageUrl,
+            category_id: categoryId,
+          })
+          .eq('id', editingItem.id);
+
+        if (updateError) throw updateError;
+
+        // Supprimer les anciennes options
+        if (editingItem.options && editingItem.options.length > 0) {
+          for (const option of editingItem.options) {
+            await supabase
+              .from('option_choices')
+              .delete()
+              .eq('option_id', option.id);
+            
+            await supabase
+              .from('options')
+              .delete()
+              .eq('id', option.id);
+          }
+        }
+
+        // Ajouter les nouvelles options si présentes
+        if (options.length > 0) {
+          const { data: optionData, error: optionError } = await supabase
+            .from('options')
+            .insert([{
+              menu_item_id: editingItem.id,
+              name: 'Options',
+              is_multiple_choice: selectionType === 'multiple'
+            }])
+            .select()
+            .single();
+
+          if (!optionError && optionData) {
+            const choices = options.map(opt => ({
+              option_id: optionData.id,
+              name: opt.name,
+              price: parseFloat(opt.price)
+            }));
+
+            await supabase
+              .from('option_choices')
+              .insert(choices);
+          }
+        }
+
+        toast({
+          title: "Plat modifié ! 🎉",
+          description: `${dishName} a été mis à jour`,
+        });
+      } else {
+        // Mode création
+        const { data: menuItem, error: menuError } = await supabase
+          .from('menu_items')
           .insert([{
-            menu_item_id: menuItem.id,
-            name: 'Options',
-            is_multiple_choice: selectionType === 'multiple'
+            name: dishName,
+            description: description,
+            price: parseFloat(dishPrice),
+            emoji: emoji,
+            image_url: imageUrl,
+            category_id: categoryId,
+            is_available: true
           }])
           .select()
           .single();
 
-        if (!optionError && optionData) {
-          const choices = options.map(opt => ({
-            option_id: optionData.id,
-            name: opt.name,
-            price: parseFloat(opt.price)
-          }));
-
-          await supabase
-            .from('option_choices')
-            .insert(choices);
+        if (menuError || !menuItem) {
+          toast({
+            title: "Erreur",
+            description: "Impossible de créer le plat",
+            variant: "destructive",
+          });
+          setIsLoading(false);
+          return;
         }
-      }
 
-      toast({
-        title: "Plat créé ! 🎉",
-        description: `${dishName} a été ajouté`,
-      });
+        // Insert options if any
+        if (options.length > 0) {
+          const { data: optionData, error: optionError } = await supabase
+            .from('options')
+            .insert([{
+              menu_item_id: menuItem.id,
+              name: 'Options',
+              is_multiple_choice: selectionType === 'multiple'
+            }])
+            .select()
+            .single();
+
+          if (!optionError && optionData) {
+            const choices = options.map(opt => ({
+              option_id: optionData.id,
+              name: opt.name,
+              price: parseFloat(opt.price)
+            }));
+
+            await supabase
+              .from('option_choices')
+              .insert(choices);
+          }
+        }
+
+        toast({
+          title: "Plat créé ! 🎉",
+          description: `${dishName} a été ajouté`,
+        });
+      }
 
       setIsLoading(false);
       onSuccess();
     } catch (error) {
       toast({
         title: "Erreur",
-        description: "Impossible de créer le plat",
+        description: editingItem ? "Impossible de modifier le plat" : "Impossible de créer le plat",
         variant: "destructive",
       });
       setIsLoading(false);
@@ -195,13 +303,24 @@ export const CreateDishForm = ({ categoryId, onSuccess }: CreateDishFormProps) =
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="dishImage" className="text-base">Image du plat *</Label>
+          <Label htmlFor="dishImage" className="text-base">
+            Image du plat {editingItem ? "(optionnel pour modification)" : "*"}
+          </Label>
+          {editingItem?.image_url && !image && (
+            <div className="mb-2">
+              <img 
+                src={editingItem.image_url} 
+                alt={editingItem.name}
+                className="w-24 h-24 object-cover rounded-lg"
+              />
+            </div>
+          )}
           <Input
             id="dishImage"
             type="file"
             accept="image/*"
             onChange={(e) => setImage(e.target.files?.[0] || null)}
-            required
+            required={!editingItem}
             className="h-12 text-base"
           />
         </div>
@@ -292,7 +411,7 @@ export const CreateDishForm = ({ categoryId, onSuccess }: CreateDishFormProps) =
       {/* Boutons d'action */}
       <div className="flex gap-3 pt-4">
         <Button type="submit" size="lg" className="flex-1" disabled={isLoading}>
-          {isLoading ? "Création..." : "Créer le plat"}
+          {isLoading ? (editingItem ? "Modification..." : "Création...") : (editingItem ? "Modifier le plat" : "Créer le plat")}
         </Button>
       </div>
     </form>

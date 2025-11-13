@@ -1,3 +1,103 @@
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Plus, Edit, Trash2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { CategoryDialog } from "./CategoryDialog";
+import { CreateDishForm } from "./CreateDishForm";
+
+export const MenuManagement = () => {
+  const [categories, setCategories] = useState<any[]>([]);
+  const [menuItems, setMenuItems] = useState<any[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchCategories();
+    fetchMenuItems();
+  }, []);
+
+  useEffect(() => {
+    if (categories.length > 0 && !selectedCategory) {
+      setSelectedCategory(categories[0].id);
+    }
+  }, [categories, selectedCategory]);
+
+  const fetchCategories = async () => {
+    const { data, error } = await supabase
+      .from("categories")
+      .select("*")
+      .order("name");
+    
+    if (error) {
+      console.error("Error fetching categories:", error);
+      return;
+    }
+    setCategories(data || []);
+  };
+
+  const fetchMenuItems = async () => {
+    const { data, error } = await supabase
+      .from("menu_items")
+      .select(`
+        *,
+        options:menu_item_options(
+          id,
+          name,
+          option_choices:menu_item_option_choices(
+            id,
+            name,
+            price
+          )
+        )
+      `)
+      .order("name");
+    
+    if (error) {
+      console.error("Error fetching menu items:", error);
+      return;
+    }
+    setMenuItems(data || []);
+  };
+
+  const handleDeleteItem = async (id: string) => {
+    const { error } = await supabase
+      .from("menu_items")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer le plat",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: "Plat supprimé",
+      description: "Le plat a été retiré du menu",
+    });
+    fetchMenuItems();
+  };
+
+  const filteredItems = menuItems.filter(item => item.category_id === selectedCategory);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-3xl font-bold">Gestion du Menu</h2>
+          <p className="text-muted-foreground">Gérez les catégories et les plats</p>
+        </div>
+        <div className="flex gap-3">
+          <CategoryDialog onSuccess={fetchCategories} />
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button size="lg" className="gap-2">

@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      beverage_types: {
+        Row: {
+          created_at: string
+          establishment_id: string
+          id: string
+          name: string
+          unit_price: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          establishment_id: string
+          id?: string
+          name: string
+          unit_price?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          establishment_id?: string
+          id?: string
+          name?: string
+          unit_price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "beverage_types_establishment_id_fkey"
+            columns: ["establishment_id"]
+            isOneToOne: false
+            referencedRelation: "establishments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           created_at: string
@@ -37,6 +72,112 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      crates: {
+        Row: {
+          beverage_type_id: string
+          bottles_per_crate: number
+          created_at: string
+          deposit_price: number
+          id: string
+          stock_quantity: number
+          updated_at: string
+        }
+        Insert: {
+          beverage_type_id: string
+          bottles_per_crate?: number
+          created_at?: string
+          deposit_price?: number
+          id?: string
+          stock_quantity?: number
+          updated_at?: string
+        }
+        Update: {
+          beverage_type_id?: string
+          bottles_per_crate?: number
+          created_at?: string
+          deposit_price?: number
+          id?: string
+          stock_quantity?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crates_beverage_type_id_fkey"
+            columns: ["beverage_type_id"]
+            isOneToOne: false
+            referencedRelation: "beverage_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      establishments: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          owner_id: string
+          type: Database["public"]["Enums"]["establishment_type"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          owner_id: string
+          type: Database["public"]["Enums"]["establishment_type"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          owner_id?: string
+          type?: Database["public"]["Enums"]["establishment_type"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      grocery_products: {
+        Row: {
+          barcode: string | null
+          created_at: string
+          establishment_id: string
+          id: string
+          name: string
+          price: number
+          stock_quantity: number
+          updated_at: string
+        }
+        Insert: {
+          barcode?: string | null
+          created_at?: string
+          establishment_id: string
+          id?: string
+          name: string
+          price?: number
+          stock_quantity?: number
+          updated_at?: string
+        }
+        Update: {
+          barcode?: string | null
+          created_at?: string
+          establishment_id?: string
+          id?: string
+          name?: string
+          price?: number
+          stock_quantity?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grocery_products_establishment_id_fkey"
+            columns: ["establishment_id"]
+            isOneToOne: false
+            referencedRelation: "establishments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       menu_items: {
         Row: {
@@ -324,14 +465,59 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          establishment_id: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          establishment_id: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          establishment_id?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_establishment_id_fkey"
+            columns: ["establishment_id"]
+            isOneToOne: false
+            referencedRelation: "establishments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _establishment_id: string
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_owner: {
+        Args: { _establishment_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
+      app_role: "admin" | "manager" | "staff"
+      establishment_type: "restaurant" | "beverage_depot" | "grocery_store"
       notification_type: "new_order" | "order_validated" | "order_completed"
       order_status: "pending" | "validated" | "completed" | "cancelled"
     }
@@ -461,6 +647,8 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "manager", "staff"],
+      establishment_type: ["restaurant", "beverage_depot", "grocery_store"],
       notification_type: ["new_order", "order_validated", "order_completed"],
       order_status: ["pending", "validated", "completed", "cancelled"],
     },
